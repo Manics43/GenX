@@ -21,6 +21,7 @@ const R = {
   mental: ["Strum's Mental Modules", 'https://github.com/Strum/Strums_Mental_VCV_Modules', 'BSD-3-Clause'],
   jw: ['JW-Modules', 'https://github.com/jeremywen/JW-Modules', 'BSD-3-Clause'],
   julio: ['JulioChaos', 'https://github.com/JulioArgudo/JulioChaos-modules', 'BSD-3-Clause'],
+  eclipse: ['Eternal Eclipse Modular', 'https://github.com/7337Productions/eternaleclipsemodular', 'GPL-3.0-or-later'],
   alikins: ['Alikins', 'https://github.com/alikins/Alikins-rack-plugins', 'GPL-3.0-or-later'],
 };
 
@@ -88,4 +89,10 @@ export const CREDITS = [
   M('mindmeld', 'MasterChannel', 'MasterChannel', 'Master', 'Master volume, soft-clip drive and stereo width.'),
   M('fundamental', 'Scope', 'Scope', 'Oscilloscope', 'Triggered oscilloscope of the master output.'),
   M('jw', 'Full Scope', 'FullScope', 'Lorenz', 'X/Y display used to draw the attractor.'),
+  // Eternal Eclipse family
+  M('eclipse', 'Cosmic Clock', 'CosmicClock', 'Cosmic Clock', 'Nine planetary LFO voices from Keplerian orbital elements, shaped by the element of the sign each planet transits and mixed by live aspects, with time warp and sign-change triggers.'),
+  M('eclipse', 'Liminal Vast Reverb', 'LiminalVast', 'Liminal Vast', '8-line feedback delay network with a Householder matrix, input diffusion, modulated lines, damping, long decay and freeze.'),
+  M('eclipse', 'Litany Engine', 'LitanyEngine', 'Litany Engine', 'Looping playback with through-zero varispeed and a granular reader (grain size from the whole loop down to 15 ms, overlap, scan, spray). GenX loops its own mix instead of bundled samples.'),
+  M('eclipse', 'Moon Phase Distortion', 'MoonPhaseDistortion', 'Moon Phase Dist', 'Stereo distortion whose depth and character follow the Moon phase from the Cosmic Clock sky, with manual override.'),
+  M('eclipse', 'Elemental Revelator', 'ElementalRevelator', 'Elemental Revelator', 'AIR / WATER / EARTH / FIRE wavetable oscillators with elemental-ring phase modulation, opposing-pair ring mod, SPIRIT chord mode, wavefolding and ladder low-pass.'),
 ];

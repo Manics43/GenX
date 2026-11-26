@@ -79,8 +79,8 @@ P('lpg_color', 'LPG Color', 0, 1, 0.6);
 P('lpg_res', 'LPG Res', 0, 1, 0.2);
 
 // Envelopes
-const ENV_DEF = { 1: [0.01, 0.4, 0.5, 1.2], 2: [0.02, 0.6, 0.25, 1.5], 3: [0.002, 0.5, 0.0, 0.8] };
-for (let i = 1; i <= 3; i++) {
+const ENV_DEF = { 1: [0.01, 0.4, 0.5, 1.2], 2: [0.02, 0.6, 0.25, 1.5], 3: [0.002, 0.5, 0.0, 0.8], 4: [2.5, 3, 0.7, 5] };
+for (let i = 1; i <= 4; i++) {
   const d = ENV_DEF[i];
   P(`env${i}_a`, 'Attack', 0.001, 8, d[0], { curve: 'exp', unit: 's' });
   P(`env${i}_d`, 'Decay', 0.005, 8, d[1], { curve: 'exp', unit: 's' });
@@ -113,6 +113,10 @@ export const MODS = [
   ['mod_lz_space', 'Lorenz Z', 'Reverb size + delay feedback', 0.15],
   ['mod_walk_pitch', 'Walk', 'Lead + drone pitch drift', 0.15],
   ['mod_env2_fold', 'ENV 2', 'VCO fold', 0.1],
+  ['mod_cc_cut', 'Cosmic Clock', 'VCF cutoff', 0.15],
+  ['mod_cc_scan', 'Cosmic Clock', 'Revelator scan', 0.5],
+  ['mod_cc_grain', 'Cosmic Clock', 'Litany scan', 0.3],
+  ['mod_cc_vast', 'Cosmic Clock', 'Vast size', 0.1],
 ];
 MODS.forEach(([id, src, dst, def]) => P(id, `${src} > ${dst}`, 0, 1, def));
 
@@ -148,9 +152,49 @@ P('dr_tone', 'Tone', 60, 6000, 700, { curve: 'exp', unit: 'Hz' });
 P('dr_spread', 'Spread', 0, 1, 0.35);
 P('dr_fifth', 'Fifth', 0, 1, 0.5);
 
-// Mixer (3 channels)
-const MIX_DEF = { 1: [0.7, -0.15, 0.35, 0.45], 2: [0.6, 0.2, 0.2, 0.35], 3: [0.35, 0, 0.0, 0.6] };
-for (let i = 1; i <= 3; i++) {
+// ---- Eternal Eclipse family ----
+export const ER_TRIG = ['BARS', 'MOON', 'SUN'];
+P('cc_rate', 'Rate', 0.005, 4, 0.12, { curve: 'exp', unit: 'Hz' });
+P('cc_warp', 'Time Warp', 1, 100000000, 100000, { curve: 'exp', fmt: (v) => 'x' + (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : v.toFixed(0)) });
+P('cc_live', 'Live Sky', 0, 1, 0, { curve: 'int' });
+P('lv_size', 'Size', 0.25, 3, 1.6);
+P('lv_decay', 'Decay', 0.3, 60, 9, { curve: 'exp', unit: 's' });
+P('lv_damp', 'Damping', 0, 1, 0.4);
+P('lv_mod', 'Modulation', 0, 1, 0.5);
+P('lv_send', 'Send', 0, 1, 0.5);
+P('lv_ret', 'Return', 0, 1, 0.45);
+P('lv_freeze', 'Freeze', 0, 1, 0, { curve: 'int' });
+P('lt_len', 'Loop', 1, 8, 4, { unit: 's' });
+P('lt_in', 'Record', 0, 1, 0.8);
+P('lt_hold', 'Hold', 0, 1, 0, { curve: 'int' });
+P('lt_speed', 'Varispeed', -2, 2, 0.5);
+P('lt_pitch', 'Pitch', -24, 24, 0, { curve: 'int', unit: 'st' });
+P('lt_size', 'Grain Size', 0, 1, 0.45);
+P('lt_dens', 'Overlap', 1, 8, 3);
+P('lt_scan', 'Scan', 0, 1, 0.3);
+P('lt_spray', 'Spray', 0, 1, 0.15);
+P('lt_spread', 'Spread', 0, 1, 0.6);
+P('mp_depth', 'Depth', 0, 1, 0.3);
+P('mp_mix', 'Mix', 0, 1, 0.3);
+P('mp_tone', 'Tone', 400, 18000, 9000, { curve: 'exp', unit: 'Hz' });
+P('mp_manual', 'Manual', 0, 1, 0, { curve: 'int' });
+P('mp_phase', 'Phase', 0, 1, 0.5);
+P('er_scan', 'Scan', 0, 1, 0.3);
+P('er_fm', 'Ring FM', 0, 1, 0.15);
+P('er_ring', 'Ring Mod', 0, 1, 0.2);
+P('er_fold', 'Fold', 0, 1, 0.1);
+P('er_cut', 'Cutoff', 60, 12000, 1400, { curve: 'exp', unit: 'Hz' });
+P('er_res', 'Res', 0, 1, 0.25);
+P('er_oct', 'Range', -2, 1, 0, { curve: 'int', unit: 'oct' });
+P('er_detune', 'Detune', 0, 1, 0.3);
+P('er_spirit', 'Spirit', 0, 1, 1, { curve: 'int' });
+P('er_trig', 'Trigger', 0, 2, 0, { curve: 'int', names: ER_TRIG });
+P('er_bars', 'Bars', 1, 8, 2, { curve: 'int' });
+P('er_gate', 'Hold', 0.1, 1, 0.6);
+
+// Mixer (5 channels: lead, macro, drone, litany, revelator)
+const MIX_DEF = { 1: [0.7, -0.15, 0.35, 0.45], 2: [0.6, 0.2, 0.2, 0.35], 3: [0.35, 0, 0.0, 0.6], 4: [0.35, 0, 0.15, 0.4], 5: [0.4, 0, 0.1, 0.5] };
+for (let i = 1; i <= 5; i++) {
   const d = MIX_DEF[i];
   P(`ch${i}_lvl`, 'Level', 0, 1, d[0]);
   P(`ch${i}_pan`, 'Pan', -1, 1, d[1]);
@@ -234,6 +278,10 @@ export const PRESETS = [
   {
     name: 'Entropy Bass', seed: 4096,
     values: { tempo: 112, eB_div: 0, eB_fill: 9, eB_entropy: 0.45, eB_range: 1.5, mac_model: 1, mac_oct: -2, mac_harm: 0.3, mac_timbre: 0.55, env3_d: 0.18, lpg_color: 0.9, ch2_lvl: 0.8, ch2_rev: 0.1, bA_prob: 0.25, q_scale: 3, q_root: 4, vcf_mode: 1, swing: 0.18 },
+  },
+  {
+    name: 'Eclipse Litany', seed: 1999,
+    values: { tempo: 60, cc_warp: 2000000, cc_rate: 0.3, er_trig: 1, er_bars: 1, er_scan: 0.6, er_ring: 0.35, ch5_lvl: 0.5, lt_size: 0.3, lt_dens: 5, lt_speed: -0.5, lt_pitch: 12, lt_spray: 0.4, ch4_lvl: 0.5, lv_decay: 25, lv_send: 0.8, lv_ret: 0.6, mp_depth: 0.55, mp_mix: 0.5, bA_prob: 0.3, q_scale: 8, q_root: 1, rv_ret: 0.4 },
   },
   {
     name: 'Glass Choir', seed: 777,

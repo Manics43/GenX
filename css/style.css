@@ -268,3 +268,19 @@ button { font-family: inherit; color: inherit; }
 
 .pastebox { width: 100%; height: 70px; margin-top: 8px; background: var(--lcd); color: var(--lcd-ink); border: 1px solid #000; border-radius: 3px; font-family: var(--mono); font-size: 12px; padding: 6px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------------------------------------------------------------- eternal eclipse */
+.grid.g5 { grid-template-columns: repeat(5, 1fr); }
+.grid.g6 { grid-template-columns: repeat(6, 1fr); }
+.cosmic { display: flex; gap: 14px; align-items: flex-start; }
+.cosmic-side { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.wheel { border-radius: 50%; }
+.aspects { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 12px; background: var(--lcd); padding: 4px 8px; border-radius: 3px; box-shadow: inset 0 0 8px #000; min-height: 50px; }
+.revel { display: flex; flex-direction: column; gap: 10px; }
+.elements { display: flex; gap: 6px; }
+.elem { font-size: 12px; font-weight: 700; letter-spacing: .12em; padding: 2px 8px; border-radius: 2px; background: #0005; }
+.elem.air { color: #dfe8ff; } .elem.water { color: #6fb0ff; } .elem.earth { color: #a8d878; } .elem.fire { color: #ff8a5a; }
+.moonmod { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.moonhead { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.litany { display: flex; flex-direction: column; gap: 8px; }
+.litany .screen { width: 100% !important; }

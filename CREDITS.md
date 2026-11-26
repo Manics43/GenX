@@ -1,6 +1,6 @@
 # Credits
 
-GenX's engine is modeled on **52 open-source VCV Rack modules** from **18 plugins**. GenX re-implements the *behaviour* of these modules in its own JavaScript DSP with fixed internal routing (no patch cables). No source code or panel graphics are copied; each plugin keeps its own license. Panel artwork of most VCV plugins is CC BY-NC-ND and must never be copied into GenX.
+GenX's engine is modeled on **57 open-source VCV Rack modules** from **19 plugins**. GenX re-implements the *behaviour* of these modules in its own JavaScript DSP with fixed internal routing (no patch cables). No source code or panel graphics are copied; each plugin keeps its own license. Panel artwork of most VCV plugins is CC BY-NC-ND and must never be copied into GenX.
 
 Generated from `js/credits.js` (run `node tools-gen-credits.mjs > CREDITS.md`).
 
@@ -26,6 +26,7 @@ Generated from `js/credits.js` (run `node tools-gen-credits.mjs > CREDITS.md`).
 | Alikins | https://github.com/alikins/Alikins-rack-plugins | GPL-3.0-or-later |
 | Surge XT Rack | https://github.com/surge-synthesizer/surge-rack | GPL-3.0-or-later |
 | MindMeld Modular | https://github.com/MarcBoule/MindMeldModular | GPL-3.0-or-later |
+| Eternal Eclipse Modular | https://github.com/7337Productions/eternaleclipsemodular | GPL-3.0-or-later |
 
 ## Modules
 
@@ -83,3 +84,8 @@ Generated from `js/credits.js` (run `node tools-gen-credits.mjs > CREDITS.md`).
 | 50 | MasterChannel | MindMeld Modular | `MasterChannel` | Master | Master volume, soft-clip drive and stereo width. |
 | 51 | Scope | VCV Fundamental | `Scope` | Oscilloscope | Triggered oscilloscope of the master output. |
 | 52 | Full Scope | JW-Modules | `FullScope` | Lorenz | X/Y display used to draw the attractor. |
+| 53 | Cosmic Clock | Eternal Eclipse Modular | `CosmicClock` | Cosmic Clock | Nine planetary LFO voices from Keplerian orbital elements, shaped by the element of the sign each planet transits and mixed by live aspects, with time warp and sign-change triggers. |
+| 54 | Liminal Vast Reverb | Eternal Eclipse Modular | `LiminalVast` | Liminal Vast | 8-line feedback delay network with a Householder matrix, input diffusion, modulated lines, damping, long decay and freeze. |
+| 55 | Litany Engine | Eternal Eclipse Modular | `LitanyEngine` | Litany Engine | Looping playback with through-zero varispeed and a granular reader (grain size from the whole loop down to 15 ms, overlap, scan, spray). GenX loops its own mix instead of bundled samples. |
+| 56 | Moon Phase Distortion | Eternal Eclipse Modular | `MoonPhaseDistortion` | Moon Phase Dist | Stereo distortion whose depth and character follow the Moon phase from the Cosmic Clock sky, with manual override. |
+| 57 | Elemental Revelator | Eternal Eclipse Modular | `ElementalRevelator` | Elemental Revelator | AIR / WATER / EARTH / FIRE wavetable oscillators with elemental-ring phase modulation, opposing-pair ring mod, SPIRIT chord mode, wavefolding and ladder low-pass. |
