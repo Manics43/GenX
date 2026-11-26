@@ -175,7 +175,7 @@ function env3() {
 
 function mixer() {
   const b = el('div', 'mixer');
-  ['LEAD', 'MACRO', 'DRONE'].forEach((name, i) => {
+  ['LEAD', 'MACRO', 'DRONE', 'LITANY', 'REVEL'].forEach((name, i) => {
     const id = i + 1;
     const s = el('div', 'strip');
     const col = el('div', 'strip-knobs');
@@ -183,7 +183,7 @@ function mixer() {
     s.append(el('div', 'chname', name), row('strip-body', fader(`ch${id}_lvl`, { label: 'Level' }), col), toggle(`ch${id}_mute`, { label: 'Mute' }));
     b.append(s);
   });
-  return module('MIXER', 'red', b, { grow: 3 });
+  return module('MIXER', 'dark', b, { grow: 5.2 });
 }
 
 function bernoulli() {
@@ -317,7 +317,7 @@ function scopeMod(w = 210, h = 120, big = false) {
   const c = canvas(w, h, 'screen');
   views.scope.push(c);
   b.append(c);
-  if (!big) b.append(row('row-knobs', knob('m_drive', { size: 's' }), knob('mod_lfo2_pan', { size: 's', label: 'Auto-Pan' })));
+  if (!big) b.append(row('row-knobs', knob('mod_lfo2_pan', { size: 's', label: 'Auto-Pan' }), knob('mp_depth', { size: 's', label: 'Moon Dist' })));
   return module('Oscilloscope', 'dark', b, { grow: big ? 1 : 2.2, titleTop: true, cls: 'centered' });
 }
 
@@ -325,16 +325,78 @@ function master() {
   const b = el('div', 'master');
   const meters = el('div', 'meters'); meters.innerHTML = '<span></span><span></span>';
   views.meters = meters.querySelectorAll('span');
-  b.append(fader('m_vol', { label: 'Volume' }), meters, fader('ch1_lvl', { label: 'Lead' }), fader('ch2_lvl', { label: 'Macro' }), fader('ch3_lvl', { label: 'Drone' }));
+  const k = el('div', 'grid g1 tight');
+  k.append(knob('m_drive', { size: 's' }), knob('m_width', { size: 's' }));
+  b.append(fader('m_vol', { label: 'Volume' }), meters, k);
   return module('Master', 'dark', b, { grow: 2.2, titleTop: true, cls: 'centered' });
+}
+
+// ---------------- Eternal Eclipse modules
+function cosmicClock() {
+  const b = el('div', 'cosmic');
+  const c = canvas(200, 200, 'screen wheel');
+  views.wheel = c;
+  const side = el('div', 'cosmic-side');
+  views.skyDate = lcd('----', 'notelcd');
+  side.append(row('memhead', el('span', 'tag', 'SKY DATE'), views.skyDate),
+    row('grid g2 tight', knob('cc_rate'), knob('cc_warp'), toggle('cc_live'), knob('mod_cc_cut', { size: 's', label: '>Cutoff' }), knob('mod_cc_scan', { size: 's', label: '>Scan' }), knob('mod_cc_grain', { size: 's', label: '>Grain' })));
+  views.aspectList = el('div', 'aspects');
+  side.append(views.aspectList);
+  b.append(c, side);
+  return module('COSMIC CLOCK', 'dark', b, { grow: 4.6 });
+}
+
+function revelator() {
+  const b = el('div', 'revel');
+  const elems = el('div', 'elements');
+  views.elemLeds = ['AIR', 'WATER', 'EARTH', 'FIRE'].map((n) => { const e = el('span', 'elem ' + n.toLowerCase(), n); elems.append(e); return e; });
+  views.revNote = lcd('--', 'notelcd');
+  const led = el('span', 'led big'); views.leds[3] = led;
+  const g = el('div', 'grid g6 tight');
+  g.append(knob('er_scan', { size: 'l' }), knob('er_fm'), knob('er_ring'), knob('er_fold'), knob('er_cut'), knob('er_res', { size: 's' }),
+    knob('er_oct', { size: 's' }), knob('er_detune', { size: 's' }), toggle('er_spirit', { label: 'Spirit Chord' }), knob('er_trig', { size: 's' }), knob('er_bars', { size: 's' }), knob('er_gate', { size: 's' }));
+  const env = row('env-row', led, knob('env4_a', { size: 's' }), knob('env4_d', { size: 's' }), knob('env4_s', { size: 's' }), knob('env4_r', { size: 's' }));
+  b.append(row('memhead', elems, views.revNote), g, env);
+  return module('ELEMENTAL REVELATOR', 'red', b, { grow: 6.2 });
+}
+
+function moonPhase() {
+  const b = el('div', 'moonmod');
+  const c = canvas(96, 96, 'moon');
+  views.moon = c;
+  views.moonLcd = lcd('--', 'notelcd');
+  requestAnimationFrame(() => drawMoon(c, state.values.mp_phase));
+  const g = el('div', 'grid g2 tight');
+  g.append(knob('mp_depth'), knob('mp_mix'), knob('mp_tone', { size: 's' }), knob('mp_phase', { size: 's' }), toggle('mp_manual'));
+  b.append(row('moonhead', c, views.moonLcd), g);
+  return module('MOON PHASE DIST', 'dark', b, { grow: 2.4 });
+}
+
+function litany() {
+  const b = el('div', 'litany');
+  const c = canvas(330, 70, 'screen');
+  views.loop = c;
+  const g = el('div', 'grid g5 tight');
+  g.append(knob('lt_speed', { size: 'l' }), knob('lt_size'), knob('lt_dens'), knob('lt_scan'), knob('lt_pitch'),
+    knob('lt_spray', { size: 's' }), knob('lt_spread', { size: 's' }), knob('lt_len', { size: 's' }), knob('lt_in', { size: 's' }), toggle('lt_hold'));
+  b.append(row('memhead', el('span', 'tag', 'TAPE LOOP OF THE MIX'), el('span', '')), c, g);
+  return module('LITANY ENGINE', 'red', b, { grow: 4.6 });
+}
+
+function liminalVast() {
+  const g = el('div', 'grid g2 tight');
+  g.append(knob('lv_size', { size: 'l' }), knob('lv_decay', { size: 'l' }), knob('lv_damp'), knob('lv_mod'), knob('lv_send', { size: 's' }), knob('lv_ret', { size: 's' }), toggle('lv_freeze'), knob('mod_cc_vast', { size: 's', label: 'Cosmic>Size' }));
+  return module('LIMINAL VAST', 'red', g, { grow: 2.4 });
 }
 
 function mainTab() {
   const t = el('div', 'tab tab-main');
   t.append(
     row('rrow', tripleVco(), vcf(), macroVco(), envStack()),
-    row('rrow', lfo(1), lfo(2), clockMod(), drone(), env3(), mixer()),
+    row('rrow', lfo(1), lfo(2), clockMod(), drone(), env3()),
     row('rrow', bernoulli(), entropy(), quantizer()),
+    row('rrow', cosmicClock(), revelator(), moonPhase()),
+    row('rrow', litany(), liminalVast(), mixer()),
     row('rrow', ...fx(), lorenzMod(), scopeMod(), master()),
   );
   return t;
@@ -347,7 +409,7 @@ function modsTab() {
   MODS.forEach(([id, src]) => (groups[src] ||= []).push(id));
   const intro = el('p', 'tabnote', 'GenX has no patch cables. Every modulation path is wired in already; these knobs set how much each fixed route is used.');
   const rowA = row('rrow');
-  const srcCtl = { 'LFO 1': ['lfo1_rate', 'lfo1_shape'], 'LFO 2': ['lfo2_rate', 'lfo2_shape'], 'Lorenz X': ['lz_rate', 'lz_rho'], Walk: ['walk_rate'] };
+  const srcCtl = { 'LFO 1': ['lfo1_rate', 'lfo1_shape'], 'LFO 2': ['lfo2_rate', 'lfo2_shape'], 'Lorenz X': ['lz_rate', 'lz_rho'], Walk: ['walk_rate'], 'Cosmic Clock': ['cc_rate', 'cc_warp'] };
   Object.entries(groups).forEach(([src, ids], i) => {
     const b = el('div', 'modgroup');
     (srcCtl[src] || []).forEach((id) => b.append(knob(id, { size: 's' })));
@@ -363,8 +425,8 @@ function trimTab() {
   const mk = (title, tone, ids) => { const b = el('div', 'modgroup'); ids.forEach((id) => b.append(knob(id, { size: 's' }))); return module(title, tone, b, { grow: ids.length }); };
   t.append(
     el('p', 'tabnote', 'Fine trims: tuning, gate lengths, clock divisions, voice levels and panning.'),
-    row('rrow', mk('TUNING', 'dark', ['tune', 'vco1_fine', 'vco2_fine', 'vco3_fine', 'vco_detune', 'glide']), mk('VOICE LEVELS', 'red', ['vco1_lvl', 'vco2_lvl', 'vco3_lvl', 'noise_lvl', 'noise_color']), mk('CLOCK', 'dark', ['tempo', 'swing', 'bA_div', 'eB_div'])),
-    row('rrow', mk('GATES', 'red', ['bA_gate', 'eB_gate', 'bA_ratchet']), mk('PANNING', 'dark', ['ch1_pan', 'ch2_pan', 'ch3_pan', 'm_width']), mk('FX TRIMS', 'red', ['dl_tone', 'dl_rev', 'rv_pre', 'rv_mod', 'm_drive', 'lpg_res'])),
+    row('rrow', mk('TUNING', 'dark', ['tune', 'vco1_fine', 'vco2_fine', 'vco3_fine', 'vco_detune', 'glide']), mk('VOICE LEVELS', 'red', ['vco1_lvl', 'vco2_lvl', 'vco3_lvl', 'noise_lvl', 'noise_color', 'ch4_lvl', 'ch5_lvl']), mk('CLOCK', 'dark', ['tempo', 'swing', 'bA_div', 'eB_div'])),
+    row('rrow', mk('GATES', 'red', ['bA_gate', 'eB_gate', 'bA_ratchet']), mk('PANNING', 'dark', ['ch1_pan', 'ch2_pan', 'ch3_pan', 'ch4_pan', 'ch5_pan', 'm_width']), mk('FX TRIMS', 'red', ['dl_tone', 'dl_rev', 'rv_pre', 'rv_mod', 'm_drive', 'lpg_res'])),
   );
   return t;
 }
@@ -567,6 +629,7 @@ function onTelemetry(d) {
       g.beginPath(); g.arc(w / 2 + lzPts[lzPts.length - 2] * w * 0.44, h / 2 - lzPts[lzPts.length - 1] * h * 0.44, 2.5, 0, Math.PI * 2); g.fill();
     }
   });
+  drawEclipse(d);
   // envelopes & LFO meters
   d.env.forEach((v, i) => views.leds[i] && (views.leds[i].style.opacity = (0.15 + Math.min(1, v) * 0.85).toFixed(2)));
   if (views.lfoMeter1) views.lfoMeter1.style.transform = `scaleX(${d.lfo[0].toFixed(3)})`;
@@ -595,6 +658,81 @@ function onTelemetry(d) {
   const pcs = new Set([d.lastA, d.lastB].filter((x) => x != null).map((x) => (((x - d.root) % 12) + 12) % 12));
   views.keys.forEach((k, i) => k.classList.toggle('hit', pcs.has(i)));
 }
+// ---------------- Eternal Eclipse drawing
+const PLANET_ABBR = ['Su', 'Mo', 'Me', 'Ve', 'Ma', 'Ju', 'Sa', 'Ur', 'Ne'];
+const PLANET_COL = ['#ffd36b', '#e8e8f0', '#b9c4d6', '#ffb7d0', '#ff6a4a', '#ffb070', '#d8c48a', '#8fe0ff', '#7a9cff'];
+const SIGNS = ['Ari', 'Tau', 'Gem', 'Can', 'Leo', 'Vir', 'Lib', 'Sco', 'Sag', 'Cap', 'Aqu', 'Pis'];
+const ELEM_COL = ['rgba(255,90,60,0.16)', 'rgba(140,200,90,0.14)', 'rgba(200,220,255,0.12)', 'rgba(80,140,255,0.16)'];
+const ASPECT_NAMES = ['conjunct', 'sextile', 'square', 'trine', 'opposite'];
+const ASPECT_COL = ['#ffd36b', '#7dff9a', '#ff5a4a', '#6fa8ff', '#ff8a2a'];
+const MOON_NAMES = ['New', 'Wax Cres', '1st Qtr', 'Wax Gibb', 'Full', 'Wan Gibb', 'Last Qtr', 'Wan Cres'];
+function drawEclipse(d) {
+  const cc = d.cc;
+  if (cc && views.wheel) {
+    const c = views.wheel, g = c.getContext('2d'), { w, h } = c, cx = w / 2, cy = h / 2, R = w / 2 - 4;
+    g.clearRect(0, 0, w, h);
+    const ang = (lon) => Math.PI - lon * Math.PI / 180; // Aries at the left, counter-clockwise
+    for (let i = 0; i < 12; i++) {
+      g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, ang(i * 30 + 30), ang(i * 30)); g.closePath();
+      g.fillStyle = ELEM_COL[i % 4]; g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.12)'; g.stroke();
+      const a = ang(i * 30 + 15);
+      g.fillStyle = 'rgba(220,225,240,0.7)'; g.font = '9px "Share Tech Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(SIGNS[i], cx + Math.cos(a) * (R - 10), cy - Math.sin(a) * (R - 10));
+    }
+    g.fillStyle = '#0b0f1a'; g.beginPath(); g.arc(cx, cy, R - 21, 0, Math.PI * 2); g.fill();
+    const pos = cc.lon.map((lon, i) => { const a = ang(lon), r = R - 32 - (i % 3) * 13; return [cx + Math.cos(a) * r, cy - Math.sin(a) * r]; });
+    g.lineWidth = 1;
+    cc.asp.forEach(([i, j, k, s]) => {
+      g.strokeStyle = ASPECT_COL[k]; g.globalAlpha = 0.25 + s * 0.6;
+      g.beginPath(); g.moveTo(...pos[i]); g.lineTo(...pos[j]); g.stroke();
+    });
+    g.globalAlpha = 1;
+    pos.forEach(([x, y], i) => {
+      g.fillStyle = PLANET_COL[i]; g.beginPath(); g.arc(x, y, 3.2, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#e8e8f0'; g.font = '9px "Share Tech Mono", monospace'; g.fillText(PLANET_ABBR[i], x, y - 8);
+    });
+    // cosmic output needle
+    g.strokeStyle = '#ff8a2a'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx, cy - cc.out * (R - 40)); g.stroke();
+    const date = new Date(Date.UTC(2000, 0, 1, 12) + cc.days * 86400000);
+    views.skyDate.textContent = isFinite(date) ? date.toISOString().slice(0, 10) : '----';
+    const top = cc.asp.slice().sort((a, b) => b[3] - a[3]).slice(0, 3);
+    views.aspectList.innerHTML = top.map(([i, j, k]) => `<span style="color:${ASPECT_COL[k]}">${PLANET_ABBR[i]} ${ASPECT_NAMES[k]} ${PLANET_ABBR[j]}</span>`).join('') || '<span>no aspects</span>';
+  }
+  if (cc && views.moon) {
+    const ph = state.values.mp_manual ? state.values.mp_phase : cc.moon;
+    drawMoon(views.moon, ph);
+    views.moonLcd.textContent = MOON_NAMES[Math.round(ph * 8) % 8];
+  }
+  if (d.lt && views.loop) {
+    if (d.lt.ov) views.loopOv = d.lt.ov;
+    const c = views.loop, g = c.getContext('2d'), { w, h } = c;
+    g.clearRect(0, 0, w, h);
+    const ov = views.loopOv || [];
+    g.fillStyle = 'rgba(160,190,255,0.55)';
+    ov.forEach((v, i) => { const bh = Math.min(1, v * 2.2) * (h - 8); g.fillRect((i / ov.length) * w, h / 2 - bh / 2, Math.max(1, w / ov.length - 0.5), bh); });
+    g.fillStyle = '#ff4a2a'; g.fillRect(d.lt.w * w, 0, 1.5, h);
+    g.fillStyle = '#7dff9a'; g.fillRect(d.lt.head * w - 1, 0, 2.5, h);
+  }
+  if (d.lastRev != null && views.revNote) views.revNote.textContent = noteName(d.lastRev);
+  if (views.elemLeds && d.env[3] != null) views.elemLeds.forEach((e) => (e.style.opacity = (0.35 + Math.min(1, d.env[3]) * 0.65).toFixed(2)));
+}
+function drawMoon(c, ph) {
+  const g = c.getContext('2d'), { w, h } = c, cx = w / 2, cy = h / 2, r = w / 2 - 6;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#1a1d26'; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  // lit part: a half disc plus/minus an ellipse whose width follows the phase
+  const k = Math.cos(ph * Math.PI * 2); // 1 new, -1 full
+  const waxing = ph < 0.5;
+  g.fillStyle = '#efe9d8'; g.shadowColor = 'rgba(255,240,200,0.6)'; g.shadowBlur = 10;
+  g.beginPath();
+  g.arc(cx, cy, r, -Math.PI / 2, Math.PI / 2, !waxing);
+  g.ellipse(cx, cy, Math.abs(k) * r, r, 0, Math.PI / 2, -Math.PI / 2, (k > 0) === waxing ? true : false);
+  g.fill(); g.shadowBlur = 0;
+  g.strokeStyle = 'rgba(255,255,255,0.15)'; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+}
+
 const noteName = (m) => NOTE_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
 function grid(g, w, h) {
   g.strokeStyle = 'rgba(120,160,255,0.12)'; g.lineWidth = 1;

@@ -268,6 +268,275 @@ class Macro {
   }
 }
 
+// ---------- Eternal Eclipse family (modeled on 7337Productions/eternaleclipsemodular) ----------
+
+// Cosmic Clock: geocentric ecliptic longitudes from J2000 Keplerian elements
+// [a, e, L0, Ldot (deg/century), peri0, peridot]
+const KEPLER = {
+  Mercury: [0.38709927, 0.20563593, 252.2503235, 149472.67411175, 77.45779628, 0.16047689],
+  Venus: [0.72333566, 0.00677672, 181.9790995, 58517.81538729, 131.60246718, 0.00268329],
+  Earth: [1.00000261, 0.01671123, 100.46457166, 35999.37244981, 102.93768193, 0.32327364],
+  Mars: [1.52371034, 0.0933941, -4.55343205, 19140.30268499, -23.94362959, 0.44441088],
+  Jupiter: [5.202887, 0.04838624, 34.39644051, 3034.74612775, 14.72847983, 0.21252668],
+  Saturn: [9.53667594, 0.05386179, 49.95424423, 1222.49362201, 92.59887831, -0.41897216],
+  Uranus: [19.18916464, 0.04725744, 313.23810451, 428.48202785, 170.9542763, 0.40805281],
+  Neptune: [30.06992276, 0.00859048, -55.12002969, 218.45945325, 44.96476227, -0.32241464],
+};
+const PLANETS = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'];
+// LFO speed ratio per planet: sqrt of mean geocentric motion relative to the Sun
+const PLANET_RATE = [1, 3.66, 2.04, 1.27, 0.73, 0.29, 0.18, 0.108, 0.077];
+const ASPECTS = [[0, 1], [60, 0.4], [90, 0.7], [120, 0.6], [180, 0.8]]; // angle, weight
+const D2R = Math.PI / 180;
+const wrap360 = (x) => ((x % 360) + 360) % 360;
+
+function helio(el, T) {
+  const [a, e, L0, Ld, w0, wd] = el;
+  const L = L0 + Ld * T, w = w0 + wd * T;
+  const M = wrap360(L - w) * D2R;
+  let E = M;
+  for (let i = 0; i < 6; i++) E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+  const xv = a * (Math.cos(E) - e), yv = a * Math.sqrt(1 - e * e) * Math.sin(E);
+  const lon = Math.atan2(yv, xv) + w * D2R;
+  const r = Math.hypot(xv, yv);
+  return [r * Math.cos(lon), r * Math.sin(lon)];
+}
+
+// d = days since J2000.0. Returns geocentric ecliptic longitudes (deg) for PLANETS.
+function skyAt(d) {
+  const T = d / 36525;
+  const [ex, ey] = helio(KEPLER.Earth, T);
+  const out = new Array(9);
+  out[0] = wrap360(Math.atan2(-ey, -ex) / D2R);
+  const Mm = (134.963 + 13.064993 * d) * D2R;
+  const Ms = (357.529 + 0.98560028 * d) * D2R;
+  const D = (297.85 + 12.190749 * d) * D2R;
+  out[1] = wrap360(218.316 + 13.176396 * d + 6.289 * Math.sin(Mm) - 1.274 * Math.sin(Mm - 2 * D) + 0.658 * Math.sin(2 * D) - 0.186 * Math.sin(Ms));
+  for (let i = 2; i < 9; i++) {
+    const [x, y] = helio(KEPLER[PLANETS[i]], T);
+    out[i] = wrap360(Math.atan2(y - ey, x - ex) / D2R);
+  }
+  return out;
+}
+
+class CosmicClock {
+  constructor() { this.ph = new Float64Array(9); this.lon = skyAt(0); this.signs = this.lon.map((l) => Math.floor(l / 30)); this.aspects = []; this.weights = new Array(9).fill(1); this.out = 0; this.events = []; }
+  updateSky(d) {
+    this.lon = skyAt(d);
+    const signs = this.lon.map((l) => Math.floor(l / 30));
+    for (let i = 0; i < 9; i++) if (signs[i] !== this.signs[i]) this.events.push(i);
+    this.signs = signs;
+    const w = new Array(9).fill(0.3);
+    const asp = [];
+    for (let i = 0; i < 9; i++) for (let j = i + 1; j < 9; j++) {
+      let sep = Math.abs(this.lon[i] - this.lon[j]); if (sep > 180) sep = 360 - sep;
+      for (let k = 0; k < ASPECTS.length; k++) {
+        const diff = Math.abs(sep - ASPECTS[k][0]);
+        if (diff < 8) { const s = (1 - diff / 8) * ASPECTS[k][1]; w[i] += s; w[j] += s; asp.push([i, j, k, +s.toFixed(2)]); }
+      }
+    }
+    this.weights = w; this.aspects = asp;
+    // moon phase: elongation of the Moon from the Sun (0 new, 0.5 full)
+    this.moonPhase = wrap360(this.lon[1] - this.lon[0]) / 360;
+  }
+  // advance planetary LFO voices; each voice's shape follows the element of its sign
+  tick(rate, dt) {
+    let s = 0, ws = 0;
+    for (let i = 0; i < 9; i++) {
+      this.ph[i] += rate * PLANET_RATE[i] * dt;
+      this.ph[i] -= Math.floor(this.ph[i]);
+      const p = (this.ph[i] + this.lon[i] / 360) % 1;
+      let v;
+      switch (this.signs[i] % 4) { // fire, earth, air, water
+        case 0: v = 2 * p - 1; break;
+        case 1: v = Math.tanh(Math.sin(2 * Math.PI * p) * 4); break;
+        case 2: v = 1 - 4 * Math.abs(p - 0.5); break;
+        default: v = Math.sin(2 * Math.PI * p);
+      }
+      s += v * this.weights[i]; ws += this.weights[i];
+    }
+    this.out = s / ws;
+    return this.out;
+  }
+}
+
+// Liminal Vast: 8-line feedback delay network with a Householder matrix
+class LiminalVast {
+  constructor(sr) {
+    this.sr = sr;
+    this.base = [29.7, 37.1, 41.1, 43.7, 53.9, 59.3, 67.1, 79.3].map((ms) => (ms / 1000) * sr);
+    this.lines = this.base.map(() => new DelayLine(Math.ceil(sr * 0.32)));
+    this.lp = new Float64Array(8);
+    this.diff = [4.7, 3.6, 12.7, 9.3].map((ms) => ({ ap: new Allpass(Math.ceil(sr * 0.02)), len: (ms / 1000) * sr }));
+    this.ph = 0;
+    this.y = new Float64Array(8);
+  }
+  tick(inL, inR, size, decaySec, damp, mod, freeze) {
+    const sr = this.sr;
+    let x = (inL + inR) * 0.5;
+    if (freeze) x = 0;
+    for (const d of this.diff) x = d.ap.tick(x, d.len * Math.min(size, 1.5), 0.6);
+    this.ph += 0.37 / sr; if (this.ph > 1) this.ph -= 1;
+    let sum = 0;
+    const out = this.y;
+    for (let i = 0; i < 8; i++) {
+      const m = Math.sin(TAU * (this.ph + i / 8)) * mod * 0.0016 * sr;
+      const v = this.lines[i].read(this.base[i] * size + m + 2);
+      this.lp[i] += (freeze ? 1 : 1 - damp * 0.85) * (v - this.lp[i]);
+      out[i] = this.lp[i]; sum += this.lp[i];
+    }
+    const h = (2 / 8) * sum;
+    let l = 0, r = 0;
+    for (let i = 0; i < 8; i++) {
+      const len = this.base[i] * size;
+      const g = freeze ? 1 : Math.pow(10, (-3 * len) / (decaySec * sr));
+      const fb = (out[i] - h) * g;
+      const inj = (i & 1 ? inR : inL) * (freeze ? 0 : 1) * (i & 2 ? -1 : 1) * 0.5 + x * 0.35;
+      const w = fb + inj;
+      this.lines[i].write(Math.abs(w) > 1.5 ? Math.tanh(w / 1.5) * 1.5 : w);
+      if (i & 1) r += out[i] * (i & 4 ? -1 : 1); else l += out[i] * (i & 2 ? -1 : 1);
+    }
+    return [l * 0.45, r * 0.45];
+  }
+}
+
+// Litany Engine: tape loop of the GenX mix with a granular / varispeed reader
+class LitanyEngine {
+  constructor(sr) {
+    this.sr = sr;
+    this.buf = new Float32Array(sr * 8);
+    this.w = 0; this.head = 0; this.spawn = 0;
+    this.voices = Array.from({ length: 8 }, () => ({ on: false, pos: 0, ph: 0, len: 1, rate: 1, pan: 0 }));
+    this.rng = Math.random;
+  }
+  read(pos, L) {
+    pos = ((pos % L) + L) % L;
+    const i = Math.floor(pos), f = pos - i;
+    const a = this.buf[i], b = this.buf[(i + 1) % L];
+    return a + (b - a) * f;
+  }
+  tick(input, p, scanMod) {
+    const sr = this.sr;
+    const L = Math.max(sr * 0.5, Math.floor(p.lt_len * sr));
+    if (!p.lt_hold) { this.buf[this.w] = this.buf[this.w] * 0.25 + input * p.lt_in; }
+    this.w = (this.w + 1) % L;
+    const speed = p.lt_speed;
+    this.head += speed; if (this.head >= L) this.head -= L; else if (this.head < 0) this.head += L;
+    const minG = 0.015 * sr;
+    const gsz = minG * Math.pow(L / minG, p.lt_size);
+    const tape = p.lt_size > 0.97;
+    const pitch = Math.pow(2, p.lt_pitch / 12);
+    const rate = tape ? speed * pitch : pitch * (speed < 0 ? -1 : 1);
+    this.spawn -= 1;
+    if (this.spawn <= 0) {
+      this.spawn = gsz / p.lt_dens;
+      const v = this.voices.find((x) => !x.on) || this.voices[0];
+      const scan = clamp(p.lt_scan + scanMod, 0, 1) * L;
+      v.on = true; v.ph = 0; v.len = gsz; v.rate = rate;
+      v.pos = this.head + scan + (this.rng() - 0.5) * p.lt_spray * L * 0.5;
+      v.pan = (this.rng() * 2 - 1) * p.lt_spread;
+    }
+    let l = 0, r = 0;
+    for (const v of this.voices) {
+      if (!v.on) continue;
+      const env = 0.5 - 0.5 * Math.cos(TAU * (v.ph / v.len));
+      const s = this.read(v.pos + v.ph * v.rate, L) * env;
+      l += s * (1 - v.pan) * 0.7; r += s * (1 + v.pan) * 0.7;
+      v.ph += 1; if (v.ph >= v.len) v.on = false;
+    }
+    const norm = 1 / Math.sqrt(Math.max(1, p.lt_dens * 0.5));
+    this.L = L;
+    return [l * norm * 2, r * norm * 2];
+  }
+  overview(n = 160) {
+    const L = this.L || this.buf.length, step = Math.floor(L / n), o = new Array(n);
+    for (let i = 0; i < n; i++) { let m = 0; for (let k = 0; k < step; k += 16) m = Math.max(m, Math.abs(this.buf[i * step + k])); o[i] = +m.toFixed(3); }
+    return o;
+  }
+}
+
+// Elemental Revelator: four elemental wavetable oscillators in a ring
+function buildTables() {
+  const N = 512, F = 8, H = 24;
+  const make = (fn) => Array.from({ length: F }, (_, f) => {
+    const t = new Float32Array(N);
+    const amps = fn(f / (F - 1));
+    for (let n = 1; n <= H; n++) { const a = amps(n); if (!a) continue; for (let i = 0; i < N; i++) t[i] += a * Math.sin((TAU * n * i) / N); }
+    let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(t[i]));
+    for (let i = 0; i < N; i++) t[i] /= pk || 1;
+    return t;
+  });
+  return [
+    make((x) => (n) => (n === 1 ? 1 : (x * 0.6 * (n % 3 === 0 ? 1 : 0.35)) / Math.pow(n, 0.9))), // AIR: breath of upper partials
+    make((x) => (n) => (n % 2 ? (n === 1 ? 1 : (x * (((n - 1) / 2) % 2 ? -1 : 1)) / (n * n) * 3) : 0)), // WATER: sine to rounded triangle
+    make((x) => (n) => { const w = 0.5 - x * 0.42; return Math.sin(Math.PI * n * w) / n; }), // EARTH: narrowing pulse
+    make((x) => (n) => (1 / n) * (1 + 3 * Math.exp(-((n - (2 + x * 14)) ** 2) / 3))), // FIRE: saw with a travelling formant
+  ];
+}
+class ElementalRevelator {
+  constructor(sr) {
+    this.sr = sr; this.tables = buildTables();
+    this.ph = new Float64Array(4); this.last = new Float64Array(4);
+    this.filt = [new Ladder(), new Ladder()];
+    this.notes = [48, 55, 60, 64]; this.cur = [48, 55, 60, 64];
+  }
+  look(e, phase, frame) {
+    const T = this.tables[e], N = 512;
+    const f0 = Math.min(6, Math.floor(frame)), fx = frame - f0;
+    const pos = (phase - Math.floor(phase)) * N, i = Math.floor(pos), k = pos - i, j = (i + 1) & 511;
+    const a = T[f0][i] + (T[f0][j] - T[f0][i]) * k, b = T[f0 + 1][i] + (T[f0 + 1][j] - T[f0 + 1][i]) * k;
+    return a + (b - a) * fx;
+  }
+  tick(p, scan, env) {
+    const sr = this.sr, frame = clamp(scan, 0, 1) * 7;
+    const o = new Array(4);
+    for (let e = 0; e < 4; e++) {
+      this.cur[e] += (this.notes[e] - this.cur[e]) * 0.0008;
+      const f = mtof(this.cur[e] + 12 * p.er_oct + (e - 1.5) * p.er_detune * 0.1);
+      this.ph[e] += f / sr; this.ph[e] -= Math.floor(this.ph[e]);
+      const pm = this.last[(e + 3) & 3] * p.er_fm * 0.35; // elemental ring: AIR>WATER>EARTH>FIRE>AIR
+      o[e] = this.look(e, this.ph[e] + pm, frame);
+    }
+    for (let e = 0; e < 4; e++) this.last[e] = o[e];
+    const ringA = o[0] * o[2], ringB = o[1] * o[3]; // opposing pairs
+    const rg = p.er_ring;
+    let l = ((o[0] + o[1]) * 0.5) * (1 - rg) + ringA * rg;
+    let r = ((o[2] + o[3]) * 0.5) * (1 - rg) + ringB * rg;
+    if (p.er_fold > 0.001) {
+      const k = 1 + p.er_fold * 5;
+      l = l * (1 - p.er_fold) + Math.sin(l * k * 1.57) * p.er_fold;
+      r = r * (1 - p.er_fold) + Math.sin(r * k * 1.57) * p.er_fold;
+    }
+    const cut = p.er_cut * Math.pow(2, env * 2);
+    l = this.filt[0].tick(l * 0.6, cut, p.er_res, 0.1, 0, sr) * env;
+    r = this.filt[1].tick(r * 0.6, cut, p.er_res, 0.1, 0, sr) * env;
+    return [l, r];
+  }
+}
+
+// Moon Phase Distortion: waxing = asymmetric warmth, waning = folding; depth follows illumination
+class MoonDistortion {
+  constructor() { this.dcL = 0; this.dcR = 0; this.lpL = 0; this.lpR = 0; }
+  shape(x, ph, depth) {
+    const illum = (1 - Math.cos(TAU * ph)) / 2;
+    const wax = 0.5 + 0.5 * Math.sin(TAU * ph);
+    const drive = 1 + depth * (1 + 14 * illum);
+    const xd = x * drive, bias = 0.35 * illum;
+    const asym = Math.tanh(xd + bias) - Math.tanh(bias);
+    const fold = Math.sin(xd * 0.5 * Math.PI) * 0.9;
+    return (wax * asym + (1 - wax) * fold) / (1 + 0.35 * depth * illum);
+  }
+  tick(l, r, p, moonPhase, sr) {
+    const ph = p.mp_manual ? p.mp_phase : moonPhase;
+    let yl = this.shape(l, ph, p.mp_depth), yr = this.shape(r, (ph + 0.003) % 1, p.mp_depth);
+    this.dcL += 0.0005 * (yl - this.dcL); this.dcR += 0.0005 * (yr - this.dcR);
+    yl -= this.dcL; yr -= this.dcR;
+    const c = 1 - Math.exp((-TAU * p.mp_tone) / sr);
+    this.lpL += c * (yl - this.lpL); this.lpR += c * (yr - this.lpR);
+    const m = p.mp_mix;
+    return [l * (1 - m) + this.lpL * m, r * (1 - m) + this.lpR * m];
+  }
+}
+
 // ---------- the processor ----------
 class GenXEngine extends AudioWorkletProcessor {
   constructor() {
@@ -280,7 +549,13 @@ class GenXEngine extends AudioWorkletProcessor {
     this.steps = new Array(16).fill(0.5);
     this.seed = 1;
     this.osc = [new Osc(), new Osc(), new Osc()];
-    this.env = [new ADSR(), new ADSR(), new ADSR()];
+    this.env = [new ADSR(), new ADSR(), new ADSR(), new ADSR()];
+    this.cosmic = new CosmicClock();
+    this.vast = new LiminalVast(sr);
+    this.litany = new LitanyEngine(sr);
+    this.revel = new ElementalRevelator(sr);
+    this.moonDist = new MoonDistortion();
+    this.days = 0; this.skyCount = 0; this.liveSky = false; this.uiFrames = 0;
     this.vcf = new Ladder();
     this.macro = new Macro(sr);
     this.lpg = new SVF();
@@ -299,7 +574,8 @@ class GenXEngine extends AudioWorkletProcessor {
     this.scope = new Float32Array(2048); this.scopeW = 0;
     this.uiCounter = 0; this.lzTrail = [];
     this.ctrl = 0;
-    this.mod = { cut: 0, pw: 0, fm: 0, wave: 0, pan: 0, timbre: 0, morph: 0, drone: 0, space: 0, pitch: 0 };
+    this.mod = { cut: 0, pw: 0, fm: 0, wave: 0, pan: 0, timbre: 0, morph: 0, drone: 0, space: 0, pitch: 0, ccCut: 0, ccScan: 0, ccGrain: 0, ccVast: 0 };
+    this.bus = { l: 0, r: 0, d: 0, v: 0 };
     this.resetSeq();
     this.port.onmessage = (e) => this.onMsg(e.data);
   }
@@ -312,6 +588,43 @@ class GenXEngine extends AudioWorkletProcessor {
     this.events = [];
     this.chordRoot = 0; this.bar = 0;
     this.lastA = null; this.lastB = null;
+    this.litany.rng = mulberry32((this.seed ^ 0x11ad) >>> 0);
+    // seeded sky: a date within a century of J2000 chosen by the seed
+    this.days = ((Math.imul(this.seed, 7919) >>> 0) % 36525) - 18262;
+    this.liveSky = false;
+    this.cosmic.updateSky(this.days); this.cosmic.events = [];
+  }
+
+  triggerRevelator(holdSamples) {
+    const p = this.p;
+    const root = (p.q_root + this.chordRoot) % 12;
+    const deg = [];
+    for (let i = 0; i < 12; i++) if (this.mask[i]) deg.push(i);
+    const base = 48 + root + p.tune;
+    let notes;
+    if (p.er_spirit) {
+      notes = [0, 2, 4, 6].map((k) => base + deg[k % deg.length] + 12 * Math.floor(k / deg.length));
+    } else {
+      notes = [base, base + 12, base, base - 12];
+    }
+    this.revel.notes = notes;
+    this.env[3].on();
+    this.schedule(this.time + holdSamples * p.er_gate, () => this.env[3].off());
+    this.lastRev = notes[0];
+  }
+
+  mixCh(id, l, r, stereo, panMod) {
+    const p = this.p, b = this.bus;
+    if (p[`ch${id}_mute`]) return;
+    const g = p[`ch${id}_lvl`];
+    const pan = clamp(p[`ch${id}_pan`] + panMod, -1, 1);
+    let gl, gr;
+    if (stereo) { gl = Math.min(1, 1 - pan); gr = Math.min(1, 1 + pan); }
+    else { const a = (pan + 1) * Math.PI * 0.25; gl = Math.cos(a); gr = Math.sin(a); }
+    const L = l * g * gl, R = r * g * gr;
+    b.l += L; b.r += R;
+    const mono = (l + r) * 0.5 * g;
+    b.d += mono * p[`ch${id}_dly`]; b.v += mono * p[`ch${id}_rev`];
   }
 
   onMsg(m) {
@@ -354,6 +667,7 @@ class GenXEngine extends AudioWorkletProcessor {
         const moves = [7, 5, 7, 5, 2, 10, 9, 3];
         this.chordRoot = (this.chordRoot + moves[Math.floor(rng() * moves.length)]) % 12;
       }
+      if (p.er_trig === 0 && this.bar % Math.max(1, p.er_bars) === 0) this.triggerRevelator(p.er_bars * 16 * tickLen);
     }
     // --- Bernoulli sequencer (Branches + Marbles + shift register + Burst) ---
     const dA = DIVS[p.bA_div] || 2;
@@ -451,6 +765,23 @@ class GenXEngine extends AudioWorkletProcessor {
     m.space = (lz.oz * 0.5 + 0.5) * p.mod_lz_space;
     m.pitch = this.walk * p.mod_walk_pitch * 0.5; // semitones
 
+    // Cosmic Clock: sky time advances by the time warp; seeded epoch unless Live Sky
+    if (p.cc_live && !this.liveSky) { this.days = (Date.now() - Date.UTC(2000, 0, 1, 12)) / 86400000; this.liveSky = true; }
+    if (!p.cc_live && this.liveSky) { this.liveSky = false; this.days = ((Math.imul(this.seed, 7919) >>> 0) % 36525) - 18262; }
+    if (this.running || p.cc_live) this.days += (p.cc_warp * dtc) / 86400;
+    if ((this.skyCount++ & 7) === 0) {
+      this.cosmic.updateSky(this.days);
+      for (const ev of this.cosmic.events) {
+        if ((p.er_trig === 1 && ev === 1) || (p.er_trig === 2 && ev === 0)) this.triggerRevelator((sr * 60 / p.tempo) * 4 * p.er_bars);
+      }
+      this.cosmic.events = [];
+    }
+    const cc = this.cosmic.tick(p.cc_rate, dtc);
+    m.ccCut = cc * p.mod_cc_cut * 2;
+    m.ccScan = cc * p.mod_cc_scan * 0.5;
+    m.ccGrain = cc * p.mod_cc_grain * 0.3;
+    m.ccVast = cc * p.mod_cc_vast * 0.6;
+
     if ((this.lzCount = (this.lzCount || 0) + 1) % 6 === 0) this.lzTrail.push(lz.ox, lz.oz);
   }
 
@@ -484,6 +815,7 @@ class GenXEngine extends AudioWorkletProcessor {
       const e1 = this.env[0].tick(p.env1_a, p.env1_d, p.env1_s, p.env1_r, sr);
       const e2 = this.env[1].tick(p.env2_a, p.env2_d, p.env2_s, p.env2_r, sr);
       const e3 = this.env[2].tick(p.env3_a, p.env3_d, p.env3_s, p.env3_r, sr);
+      const e4 = this.env[3].tick(p.env4_a, p.env4_d, p.env4_s, p.env4_r, sr);
 
       // ---- lead voice: Triple VCO → VCF → VCA ----
       const gl = p.glide;
@@ -514,7 +846,7 @@ class GenXEngine extends AudioWorkletProcessor {
       const noise = c < 0.5 ? wn * (1 - c * 2) + pink * c * 2 : pink * (2 - c * 2) + this.brown * 3 * (c * 2 - 1);
       vmix += noise * p.noise_lvl;
       const keyOct = ((basePitch - 60) / 12) * p.vcf_key;
-      const cut = p.vcf_cut * Math.pow(2, keyOct + m.cut + e2 * p.vcf_env * 6);
+      const cut = p.vcf_cut * Math.pow(2, keyOct + m.cut + m.ccCut + e2 * p.vcf_env * 6);
       const filt = this.vcf.tick(vmix, cut, p.vcf_res, p.vcf_drive, p.vcf_mode, sr);
       const lead = filt * e1;
 
@@ -537,18 +869,21 @@ class GenXEngine extends AudioWorkletProcessor {
       const drone = this.droneF.tick(dr * 0.35, p.dr_tone * Math.pow(2, m.drone), 0.3, sr);
 
       // ---- mixer (MixMaster style) ----
-      const chans = [lead, macro, drone];
-      let sl = 0, sr2 = 0, dsend = 0, rsend = 0;
-      for (let ch = 0; ch < 3; ch++) {
-        const id = ch + 1;
-        if (p[`ch${id}_mute`]) continue;
-        const s = chans[ch] * p[`ch${id}_lvl`];
-        let pan = p[`ch${id}_pan`];
-        if (ch === 0) pan = clamp(pan + m.pan, -1, 1);
-        const a = (pan + 1) * Math.PI * 0.25;
-        sl += s * Math.cos(a); sr2 += s * Math.sin(a);
-        dsend += s * p[`ch${id}_dly`]; rsend += s * p[`ch${id}_rev`];
-      }
+      // ---- Elemental Revelator (chord voice) ----
+      const [revL, revR] = this.revel.tick(p, p.er_scan + m.ccScan, e4);
+
+      // ---- mixer (MixMaster style) ----
+      const bus = this.bus;
+      bus.l = 0; bus.r = 0; bus.d = 0; bus.v = 0;
+      this.mixCh(1, lead, lead, false, m.pan);
+      this.mixCh(2, macro, macro, false, 0);
+      this.mixCh(3, drone, drone, false, 0);
+      this.mixCh(5, revL, revR, true, 0);
+      // ---- Litany Engine: loops the mix above and plays it back as grains or tape ----
+      const [ltL, ltR] = this.litany.tick((bus.l + bus.r) * 0.5, p, m.ccGrain);
+      this.mixCh(4, ltL, ltR, true, 0);
+      let sl = bus.l, sr2 = bus.r;
+      const dsend = bus.d, rsend = bus.v;
 
       // ---- chorus (insert on mix bus) ----
       this.choPh += p.cho_rate / sr; if (this.choPh >= 1) this.choPh -= 1;
@@ -580,9 +915,14 @@ class GenXEngine extends AudioWorkletProcessor {
       const rin = rsend + (yl + yr) * 0.5 * p.dl_rev;
       const [rl, rr] = this.plate.tick(rin, clamp(p.rv_size + m.space * 0.6, 0.3, 2.2), p.rv_decay, p.rv_damp, p.rv_pre, p.rv_mod, sr);
 
+      // ---- Liminal Vast FDN (fed from the reverb send) ----
+      const [vl, vr] = this.vast.tick(rin * p.lv_send, rin * p.lv_send, clamp(p.lv_size + m.ccVast, 0.25, 3), p.lv_decay, p.lv_damp, p.lv_mod, p.lv_freeze);
+
       // ---- master ----
-      let ml = sl + dOutL + rl * p.rv_ret;
-      let mr = sr2 + dOutR + rr * p.rv_ret;
+      let ml = sl + dOutL + rl * p.rv_ret + vl * p.lv_ret;
+      let mr = sr2 + dOutR + rr * p.rv_ret + vr * p.lv_ret;
+      // ---- Moon Phase Distortion (master insert) ----
+      if (p.mp_mix > 0.001) [ml, mr] = this.moonDist.tick(ml, mr, p, this.cosmic.moonPhase, sr);
       const mid = (ml + mr) * 0.5, side = (ml - mr) * 0.5 * p.m_width;
       ml = mid + side; mr = mid - side;
       const dg = 1 + p.m_drive * 4;
@@ -610,7 +950,10 @@ class GenXEngine extends AudioWorkletProcessor {
       for (let k = 0; k < 512; k++) s[k] = this.scope[(start + k) & 2047];
       this.port.postMessage({
         t: 'ui', scope: s, lz: this.lzTrail.splice(0),
-        env: [this.env[0].v, this.env[1].v, this.env[2].v],
+        env: [this.env[0].v, this.env[1].v, this.env[2].v, this.env[3].v],
+        cc: { lon: this.cosmic.lon, asp: this.cosmic.aspects, moon: this.cosmic.moonPhase, out: this.cosmic.out, days: this.days },
+        lt: { head: this.litany.head / (this.litany.L || 1), w: this.litany.w / (this.litany.L || 1), ov: (this.uiFrames++ % 10 === 0) ? this.litany.overview() : null },
+        lastRev: this.lastRev ?? null,
         posA: this.posA, posB: this.posB, tick: this.tick,
         regA: this.regA.map((c) => [c.v, c.g ? c.burst : 0]),
         lastA: this.lastA, lastB: this.lastB,
